@@ -83,6 +83,8 @@ npm run build
 
 The production output is `dist/`.
 
+Two probes in `tools/` answer questions about the model by measuring rather than reasoning. `npm run probe:preprocess` runs one frame under each preprocessing and prints the best detection per class, which is what settled the two-pass split. `npm run probe:still` runs the whole app end to end outside a browser against a stubbed DOM. Neither is part of `npm test`, because both load the real 10 MB model. See `tools/README.md`.
+
 ## Model
 
 The repository includes the FP32 export at:
