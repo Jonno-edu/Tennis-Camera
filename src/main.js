@@ -5,6 +5,8 @@ import { drawOverlay, clearOverlay } from "./overlay.js";
 import { BALL_CLASS_ID, selectVisibleDetections } from "./postprocess.js";
 import { calculateCrop, calculateResize, createPreprocessor } from "./preprocess.js";
 import { createBallSearch } from "./ball-search.js";
+import { buildCourtMapping, describePosition, groundPosition } from "./court-mapping.js";
+import { formatPosition } from "./overlay.js";
 
 // The court pass sees the whole frame and barely changes on a fixed phone, so
 // it runs every few frames. The ball pass runs every frame.
@@ -28,6 +30,9 @@ const elements = {
   confidence: document.querySelector("#confidence-input"),
   confidenceValue: document.querySelector("#confidence-value"),
   showCourtLines: document.querySelector("#show-court-lines-input"),
+  showMappedCourt: document.querySelector("#show-mapped-court-input"),
+  mapping: document.querySelector("#mapping-status"),
+  position: document.querySelector("#position-status"),
   showAll: document.querySelector("#show-all-input"),
 };
 
@@ -35,6 +40,7 @@ const preprocess = createPreprocessor();
 const ballSearch = createBallSearch();
 let model = null;
 let courtDetections = [];
+let courtMapping = null;
 let framesSinceCourtPass = Number.POSITIVE_INFINITY;
 let sourceActive = false;
 let loopGeneration = 0;
@@ -66,6 +72,16 @@ function updateDetectionMetrics(bestCourt, bestBall) {
   elements.ball.textContent = bestBall ? `${Math.round(bestBall.confidence * 100)}%` : "None";
 }
 
+function updatePositionMetrics(mapping, position) {
+  elements.mapping.textContent = mapping ? `Fit ${mapping.residual.toFixed(1)} px` : "None";
+  if (!position) {
+    elements.position.textContent = mapping ? "No ball" : "Needs court and net";
+    return;
+  }
+  // Positive x is toward the right sideline, positive y toward the far baseline.
+  elements.position.textContent = `${formatPosition(position)} · ${describePosition(position)}`;
+}
+
 function recordCompletion(now) {
   completionTimes.push(now);
   completionTimes = completionTimes.filter((time) => now - time <= 2_000);
@@ -77,8 +93,10 @@ function stopInference() {
   loopGeneration += 1;
   completionTimes = [];
   courtDetections = [];
+  courtMapping = null;
   framesSinceCourtPass = Number.POSITIVE_INFINITY;
   ballSearch.reset();
+  updatePositionMetrics(null, null);
   clearOverlay(elements.canvas);
   updateDetectionMetrics(null, null);
   elements.fps.textContent = "0.0 FPS";
@@ -107,6 +125,9 @@ async function inferenceLoop(generation) {
         const pass = await model.run(preprocess(elements.video, transform), transform, confidenceThreshold);
         if (generation !== loopGeneration) return;
         courtDetections = pass.detections.filter((detection) => detection.classId !== BALL_CLASS_ID);
+        const { bestCourt } = selectVisibleDetections(courtDetections);
+        // The camera is usually still, so keep the last good fit if this one fails.
+        courtMapping = buildCourtMapping(courtDetections, bestCourt) ?? courtMapping;
         latency += pass.latency;
         framesSinceCourtPass = 0;
       } else {
@@ -122,17 +143,22 @@ async function inferenceLoop(generation) {
       const detections = [...courtDetections, ...balls];
       const { bestCourt, bestBall } = selectVisibleDetections(detections);
       ballSearch.record(bestBall);
+      const ballPosition = bestBall ? groundPosition(courtMapping, bestBall) : null;
 
-      drawOverlay(
-        elements.canvas,
-        elements.video,
+      drawOverlay(elements.canvas, elements.video, {
         detections,
         bestCourt,
         bestBall,
-        elements.showAll.checked,
-        elements.showCourtLines.checked,
-      );
+        mapping: courtMapping,
+        ballPosition,
+        show: {
+          all: elements.showAll.checked,
+          courtLines: elements.showCourtLines.checked,
+          mappedCourt: elements.showMappedCourt.checked,
+        },
+      });
       updateDetectionMetrics(bestCourt, bestBall);
+      updatePositionMetrics(courtMapping, ballPosition);
       elements.latency.textContent = `${Math.round(latency)} ms`;
       elements.fps.textContent = `${recordCompletion(performance.now()).toFixed(1)} FPS`;
       inferenceErrorShown = false;
@@ -180,8 +206,9 @@ elements.confidence.addEventListener("input", () => {
   elements.confidenceValue.value = Number(elements.confidence.value).toFixed(2);
 });
 
-elements.showAll.addEventListener("change", () => clearOverlay(elements.canvas));
-elements.showCourtLines.addEventListener("change", () => clearOverlay(elements.canvas));
+for (const toggle of [elements.showAll, elements.showCourtLines, elements.showMappedCourt]) {
+  toggle.addEventListener("change", () => clearOverlay(elements.canvas));
+}
 elements.video.addEventListener("loadedmetadata", fitStageToSource);
 window.addEventListener("resize", () => {
   updateOrientationNote();

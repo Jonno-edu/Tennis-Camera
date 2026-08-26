@@ -181,9 +181,13 @@ h1 {
   white-space: nowrap;
 }
 
+.metric-wide {
+  grid-column: 1 / -1;
+}
+
 .debug-controls {
   display: grid;
-  grid-template-columns: minmax(130px, 220px) minmax(160px, 1fr) auto auto;
+  grid-template-columns: minmax(130px, 220px) minmax(160px, 1fr) auto auto auto;
   align-items: center;
   gap: 12px;
   color: #c8d0cb;

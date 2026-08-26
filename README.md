@@ -50,7 +50,17 @@ Inference runs entirely in the browser. Camera frames are not sent to the server
 - Runtime, latency, inference FPS, court confidence, and ball confidence
 - Inference pause while the page is hidden
 
-Calibration, tracking, line calling, recording, accounts, analytics, and server inference are intentionally absent. The court-line overlay uses the model's doubles-alley, service-box, and net detections. It does not calculate a homography or claim line-call accuracy.
+Calibration, recording, accounts, analytics, and server inference are intentionally absent.
+
+## Ball coordinates
+
+The app reads the ball's position on the court in metres, live. Origin is the centre of the net, X runs across toward the right sideline, Y runs along toward the far baseline.
+
+The mapping is a homography solved from two detections. The court box is the bounding rectangle of a trapezoid, so its corners are not court corners, but its widest row is the near baseline, which puts two corners on its bottom edge. The net box supplies the other two: its horizontal extent is the post-to-post span, and its bottom edge is where the net meets the ground. Turn on `Mapped court` to draw the court model back over the frame and see the fit.
+
+Accuracy on the test frame, measured against the two service lines the fit never sees, is about 0.35 m. That is a readout, not a line call.
+
+Two things break it. The fit assumes the camera sits behind the near baseline, roughly level. Roll the phone and the near baseline stops being horizontal, the box corners stop being court corners, and the fit degrades without saying so. Worse, a homography maps the ground plane only, so a ball in the air reads further away than it is. On the test frame's geometry a ball 1 m up reads 2.7 m to 5.4 m long depending on depth, and the error scales as `h / (h - height)`, so a low tripod is far worse than a high one. These coordinates only mean what they say at the bounce.
 
 ## Install and run
 
