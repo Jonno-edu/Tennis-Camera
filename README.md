@@ -160,8 +160,12 @@ Connect the repository in the Cloudflare dashboard and pick this branch, or depl
 
 ```bash
 npm run build
-npx wrangler pages deploy
+npm run deploy
 ```
+
+If the project uses a separate deploy command in its hosting settings, set it
+to `npm run deploy`. Do not use `wrangler versions upload`, which deploys a
+Worker and does not read this Pages output.
 
 Cloudflare Pages supplies HTTPS, which is what the rear camera needs. No Function, Worker, inference API, or database is involved.
 

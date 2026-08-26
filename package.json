@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "deploy": "npx wrangler pages deploy dist",
     "preview": "vite preview",
     "test": "vite build && node --test",
     "probe:preprocess": "node tools/preprocess-probe.mjs",
