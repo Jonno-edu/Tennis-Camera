@@ -2,8 +2,13 @@ import "./style.css";
 import { loadLocalVideo, startRearCamera, stopSource } from "./camera.js";
 import { loadModel } from "./inference.js";
 import { drawOverlay, clearOverlay } from "./overlay.js";
-import { selectVisibleDetections } from "./postprocess.js";
-import { createPreprocessor } from "./preprocess.js";
+import { BALL_CLASS_ID, selectVisibleDetections } from "./postprocess.js";
+import { calculateCrop, calculateResize, createPreprocessor } from "./preprocess.js";
+import { createBallSearch } from "./ball-search.js";
+
+// The court pass sees the whole frame and barely changes on a fixed phone, so
+// it runs every few frames. The ball pass runs every frame.
+const COURT_REFRESH_FRAMES = 5;
 
 const elements = {
   stage: document.querySelector("#camera-container"),
@@ -22,11 +27,15 @@ const elements = {
   ball: document.querySelector("#ball-status"),
   confidence: document.querySelector("#confidence-input"),
   confidenceValue: document.querySelector("#confidence-value"),
+  showCourtLines: document.querySelector("#show-court-lines-input"),
   showAll: document.querySelector("#show-all-input"),
 };
 
 const preprocess = createPreprocessor();
+const ballSearch = createBallSearch();
 let model = null;
+let courtDetections = [];
+let framesSinceCourtPass = Number.POSITIVE_INFINITY;
 let sourceActive = false;
 let loopGeneration = 0;
 let completionTimes = [];
@@ -67,6 +76,9 @@ function recordCompletion(now) {
 function stopInference() {
   loopGeneration += 1;
   completionTimes = [];
+  courtDetections = [];
+  framesSinceCourtPass = Number.POSITIVE_INFINITY;
+  ballSearch.reset();
   clearOverlay(elements.canvas);
   updateDetectionMetrics(null, null);
   elements.fps.textContent = "0.0 FPS";
@@ -86,21 +98,42 @@ async function inferenceLoop(generation) {
     }
 
     try {
-      const { tensorData, transform } = preprocess(elements.video);
-      const result = await model.run(tensorData, transform, Number(elements.confidence.value));
-      if (generation !== loopGeneration) return;
+      const { videoWidth, videoHeight } = elements.video;
+      const confidenceThreshold = Number(elements.confidence.value);
+      let latency = 0;
 
-      const { bestCourt, bestBall } = selectVisibleDetections(result.detections);
+      if (framesSinceCourtPass >= COURT_REFRESH_FRAMES) {
+        const transform = calculateResize(videoWidth, videoHeight);
+        const pass = await model.run(preprocess(elements.video, transform), transform, confidenceThreshold);
+        if (generation !== loopGeneration) return;
+        courtDetections = pass.detections.filter((detection) => detection.classId !== BALL_CLASS_ID);
+        latency += pass.latency;
+        framesSinceCourtPass = 0;
+      } else {
+        framesSinceCourtPass += 1;
+      }
+
+      const ballTransform = calculateCrop(videoWidth, videoHeight, ballSearch.nextCenterX(videoWidth, videoHeight));
+      const ballPass = await model.run(preprocess(elements.video, ballTransform), ballTransform, confidenceThreshold);
+      if (generation !== loopGeneration) return;
+      const balls = ballPass.detections.filter((detection) => detection.classId === BALL_CLASS_ID);
+      latency += ballPass.latency;
+
+      const detections = [...courtDetections, ...balls];
+      const { bestCourt, bestBall } = selectVisibleDetections(detections);
+      ballSearch.record(bestBall);
+
       drawOverlay(
         elements.canvas,
         elements.video,
-        result.detections,
+        detections,
         bestCourt,
         bestBall,
         elements.showAll.checked,
+        elements.showCourtLines.checked,
       );
       updateDetectionMetrics(bestCourt, bestBall);
-      elements.latency.textContent = `${Math.round(result.latency)} ms`;
+      elements.latency.textContent = `${Math.round(latency)} ms`;
       elements.fps.textContent = `${recordCompletion(performance.now()).toFixed(1)} FPS`;
       inferenceErrorShown = false;
     } catch (error) {
@@ -148,6 +181,7 @@ elements.confidence.addEventListener("input", () => {
 });
 
 elements.showAll.addEventListener("change", () => clearOverlay(elements.canvas));
+elements.showCourtLines.addEventListener("change", () => clearOverlay(elements.canvas));
 elements.video.addEventListener("loadedmetadata", fitStageToSource);
 window.addEventListener("resize", () => {
   updateOrientationNote();

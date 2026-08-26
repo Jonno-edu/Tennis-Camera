@@ -2,25 +2,36 @@
 
 CourtSide mobile is a small browser test for one question. Can the CourtSide YOLO model detect a tennis court and a ball on a real phone at a real court?
 
-The app opens the rear camera or a local video, letterboxes each frame to 640 by 640, runs ONNX Runtime Web, applies YOLO decoding and NMS, then draws one court and one ball. It has no backend.
+The app opens the rear camera or a local video, runs two ONNX passes over it, applies YOLO decoding and NMS, then draws one court and one ball. It has no backend.
+
+The two passes exist because the court and the ball need opposite preprocessing. Measured on one 987 by 622 broadcast frame: a full-frame stretch to 640 by 640 detects the court at 98 percent and the ball not at all, while an undistorted square crop detects the ball at 75 to 84 percent and no court class at all. Letterboxing serves neither, because the model was trained on stretched images and the grey bars drop every court class below 5 percent. Cropping tighter than about 1.3x also loses the ball, so the model wants the ball near its trained size of 8 to 9 pixels.
 
 ```text
-phone camera or local video
-            |
-            v
-  640 x 640 letterbox
-            |
-            v
- ONNX Runtime Web on the device
-            |
-            v
-  YOLO decode and NMS
-            |
-            v
- best court and best ball
-            |
-            v
-       canvas overlay
+       phone camera or local video
+                    |
+        +-----------+-----------+
+        |                       |
+        v                       v
+ court pass:              ball pass:
+ full-frame stretch       square crop
+ to 640 x 640             to 640 x 640
+ every 5 frames           every frame
+        |                       |
+        v                       v
+      ONNX Runtime Web on the device
+                    |
+                    v
+            YOLO decode and NMS
+                    |
+        +-----------+-----------+
+        |                       |
+        v                       v
+   best court              best ball
+        |                       |
+        +-----------+-----------+
+                    |
+                    v
+              canvas overlay
 ```
 
 Inference runs entirely in the browser. Camera frames are not sent to the server.
@@ -33,12 +44,13 @@ Inference runs entirely in the browser. Camera frames are not sent to the server
 - YOLO11 raw output decoding for `[1, 14, N]` and `[1, N, 14]`
 - Decoding for a common end-to-end NMS output shaped `[1, N, 6]`
 - Class-aware NMS at an IoU threshold of `0.45`
-- One court box and one visible ball marker
+- One court box, a model-guided court-line overlay, and one visible ball marker
+- A ball crop that sweeps across wide frames and then locks onto the ball it finds
 - Confidence control from `0.15` to `0.40`, starting at `0.25`
 - Runtime, latency, inference FPS, court confidence, and ball confidence
 - Inference pause while the page is hidden
 
-Calibration, tracking, line calling, recording, accounts, analytics, and server inference are intentionally absent.
+Calibration, tracking, line calling, recording, accounts, analytics, and server inference are intentionally absent. The court-line overlay uses the model's doubles-alley, service-box, and net detections. It does not calculate a homography or claim line-call accuracy.
 
 ## Install and run
 
@@ -113,10 +125,11 @@ Check these points before using a camera:
 1. The model status changes to `Ready`.
 2. The runtime reads `WebGPU` or `WASM`.
 3. The court box follows the court in the video.
-4. The ball circle sits over the detected ball.
-5. Lowering the confidence control reveals weaker detections without shifting their coordinates.
+4. Detected doubles alleys and service boxes have white outlines. A detected net has a dashed yellow line.
+5. The ball circle sits over the detected ball.
+6. Lowering the confidence control reveals weaker detections without shifting their coordinates.
 
-If a box is consistently displaced, stop there. Fix letterbox reversal or display scaling before testing on a phone.
+If a box is consistently displaced, stop there. Fix resize reversal or display scaling before testing on a phone.
 
 ## Deploy to Cloudflare Pages
 
@@ -169,7 +182,7 @@ Moving ball:
 Problems:
 ```
 
-Far-ball failure does not invalidate this test. A ball at the opposite baseline may cover only a few pixels in a 640 by 640 input. That result would tell us what to work on next.
+Far-ball failure does not invalidate this test. A ball at the opposite baseline may cover only a few pixels in the square crop, and the crop cannot add pixels the frame never had. The measured limit is that cropping tighter than about 1.3x loses the ball rather than recovering it, so a far-ball failure needs a longer lens or a model retrained on smaller balls, not a tighter crop.
 
 ## Network and privacy check
 

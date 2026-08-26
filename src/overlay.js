@@ -1,5 +1,9 @@
+import { buildCourtLineSegments, selectCourtLineDetections } from "./court-lines.js";
+
 const COLORS = {
   court: "#44e28b",
+  courtLine: "#f4fff7",
+  net: "#eaff45",
   tennis_ball: "#eaff45",
   other: "#70b7ff",
 };
@@ -51,13 +55,50 @@ function displayBox(detection, rect) {
   };
 }
 
-function drawCourt(context, detection, rect) {
+function drawCourt(context, detection, rect, lineCount = 0) {
   const box = displayBox(detection, rect);
   const color = COLORS.court;
   context.strokeStyle = color;
   context.lineWidth = 3;
   context.strokeRect(box.x1, box.y1, box.x2 - box.x1, box.y2 - box.y1);
-  drawLabel(context, `COURT ${Math.round(detection.confidence * 100)}%`, box.x1, box.y1, color);
+  const lineStatus = lineCount ? ` · LINES ${lineCount}/5` : "";
+  drawLabel(context, `COURT ${Math.round(detection.confidence * 100)}%${lineStatus}`, box.x1, box.y1, color);
+}
+
+function drawCourtLines(context, court, courtParts, rect) {
+  const segments = buildCourtLineSegments(court, courtParts);
+
+  for (const segment of segments) {
+    const startX = rect.x + segment.x1 * rect.scale;
+    const startY = rect.y + segment.y1 * rect.scale;
+    const endX = rect.x + segment.x2 * rect.scale;
+    const endY = rect.y + segment.y2 * rect.scale;
+    const color = segment.role === "net"
+      ? COLORS.net
+      : segment.role === "boundary" ? COLORS.court : COLORS.courtLine;
+    const width = segment.role === "boundary" ? 2.5 : 2;
+
+    context.save();
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    context.globalAlpha = Math.max(0.5, Math.min(0.92, segment.confidence));
+    if (segment.role === "net") context.setLineDash([8, 6]);
+
+    context.beginPath();
+    context.moveTo(startX, startY);
+    context.lineTo(endX, endY);
+    context.strokeStyle = "rgba(2, 4, 3, 0.78)";
+    context.lineWidth = width + 3;
+    context.stroke();
+
+    context.beginPath();
+    context.moveTo(startX, startY);
+    context.lineTo(endX, endY);
+    context.strokeStyle = color;
+    context.lineWidth = width;
+    context.stroke();
+    context.restore();
+  }
 }
 
 function drawBall(context, detection, rect) {
@@ -98,15 +139,17 @@ export function clearOverlay(canvas) {
   prepareCanvas(canvas);
 }
 
-export function drawOverlay(canvas, source, detections, bestCourt, bestBall, showAll) {
+export function drawOverlay(canvas, source, detections, bestCourt, bestBall, showAll, showCourtLines) {
   const context = prepareCanvas(canvas);
   const rect = contentRect(canvas, source.videoWidth, source.videoHeight);
+  const courtParts = selectCourtLineDetections(detections, bestCourt);
 
   if (showAll) {
     for (const detection of detections) {
       if (detection !== bestCourt && detection !== bestBall) drawOther(context, detection, rect);
     }
   }
-  if (bestCourt) drawCourt(context, bestCourt, rect);
+  if (bestCourt && showCourtLines) drawCourtLines(context, bestCourt, courtParts, rect);
+  if (bestCourt) drawCourt(context, bestCourt, rect, showCourtLines ? courtParts.length : 0);
   if (bestBall) drawBall(context, bestBall, rect);
 }

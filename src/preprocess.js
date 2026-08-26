@@ -1,17 +1,43 @@
 export const MODEL_SIZE = 640;
 
-export function calculateLetterbox(sourceWidth, sourceHeight, targetSize = MODEL_SIZE) {
+/**
+ * The model was trained on frames stretched to a square, so the court classes
+ * only fire on a full-frame stretch. That same stretch flattens the ball out of
+ * existence, so the ball needs an undistorted square crop instead. Both regions
+ * are described the same way here and differ only in which source rectangle
+ * they read.
+ */
+function createTransform(sourceWidth, sourceHeight, region, targetSize) {
+  return {
+    scaleX: targetSize / region.width,
+    scaleY: targetSize / region.height,
+    offsetX: region.x,
+    offsetY: region.y,
+    region,
+    sourceWidth,
+    sourceHeight,
+    targetSize,
+  };
+}
+
+function assertDimensions(sourceWidth, sourceHeight) {
   if (sourceWidth <= 0 || sourceHeight <= 0) {
     throw new Error("Video dimensions are unavailable.");
   }
+}
 
-  const scale = Math.min(targetSize / sourceWidth, targetSize / sourceHeight);
-  const resizedWidth = Math.round(sourceWidth * scale);
-  const resizedHeight = Math.round(sourceHeight * scale);
-  const padX = Math.floor((targetSize - resizedWidth) / 2);
-  const padY = Math.floor((targetSize - resizedHeight) / 2);
+export function calculateResize(sourceWidth, sourceHeight, targetSize = MODEL_SIZE) {
+  assertDimensions(sourceWidth, sourceHeight);
+  const region = { x: 0, y: 0, width: sourceWidth, height: sourceHeight };
+  return createTransform(sourceWidth, sourceHeight, region, targetSize);
+}
 
-  return { scale, resizedWidth, resizedHeight, padX, padY, sourceWidth, sourceHeight, targetSize };
+export function calculateCrop(sourceWidth, sourceHeight, centerX, targetSize = MODEL_SIZE) {
+  assertDimensions(sourceWidth, sourceHeight);
+  const side = Math.min(sourceWidth, sourceHeight);
+  const x = Math.max(0, Math.min(sourceWidth - side, centerX - side / 2));
+  const y = Math.max(0, Math.min(sourceHeight - side, (sourceHeight - side) / 2));
+  return createTransform(sourceWidth, sourceHeight, { x, y, width: side, height: side }, targetSize);
 }
 
 export function createPreprocessor(targetSize = MODEL_SIZE) {
@@ -22,17 +48,9 @@ export function createPreprocessor(targetSize = MODEL_SIZE) {
 
   if (!context) throw new Error("Canvas pixel access is unavailable.");
 
-  return function preprocess(source) {
-    const transform = calculateLetterbox(source.videoWidth, source.videoHeight, targetSize);
-    context.fillStyle = "rgb(114, 114, 114)";
-    context.fillRect(0, 0, targetSize, targetSize);
-    context.drawImage(
-      source,
-      transform.padX,
-      transform.padY,
-      transform.resizedWidth,
-      transform.resizedHeight,
-    );
+  return function preprocess(source, transform) {
+    const { region } = transform;
+    context.drawImage(source, region.x, region.y, region.width, region.height, 0, 0, targetSize, targetSize);
 
     const rgba = context.getImageData(0, 0, targetSize, targetSize).data;
     const area = targetSize * targetSize;
@@ -44,6 +62,6 @@ export function createPreprocessor(targetSize = MODEL_SIZE) {
       tensorData[area * 2 + pixel] = rgba[rgbaIndex + 2] / 255;
     }
 
-    return { tensorData, transform };
+    return tensorData;
   };
 }

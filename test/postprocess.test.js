@@ -42,16 +42,17 @@ test("suppresses overlapping boxes only within the same class", () => {
   assert.deepEqual(nonMaxSuppression([a, b, court], 0.45), [a, court]);
 });
 
-test("removes letterbox padding and selects one court and one ball", () => {
+test("restores detections through the transform and selects one court and one ball", () => {
   const transform = {
-    scale: 0.5,
-    padX: 0,
-    padY: 140,
+    scaleX: 0.5,
+    scaleY: 0.8,
+    offsetX: 0,
+    offsetY: 0,
     sourceWidth: 1280,
     sourceHeight: 720,
   };
   const ball = restoreCoordinates(
-    { x1: 100, y1: 190, x2: 110, y2: 200, confidence: 0.7, classId: 1 },
+    { x1: 100, y1: 80, x2: 110, y2: 96, confidence: 0.7, classId: 1 },
     transform,
   );
   assert.deepEqual([ball.x1, ball.y1, ball.x2, ball.y2], [200, 100, 220, 120]);

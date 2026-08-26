@@ -11,6 +11,9 @@ export const CLASS_NAMES = [
   "top-dead-zone",
 ];
 
+export const BALL_CLASS_ID = CLASS_NAMES.indexOf("tennis_ball");
+export const COURT_CLASS_ID = CLASS_NAMES.indexOf("court");
+
 const CLASS_COUNT = CLASS_NAMES.length;
 
 function tensorValue(data, dims, detectionIndex, featureIndex) {
@@ -137,21 +140,22 @@ export function nonMaxSuppression(detections, iouThreshold = 0.45) {
 
 export function restoreCoordinates(detection, transform) {
   const clamp = (value, maximum) => Math.max(0, Math.min(maximum, value));
+  const { offsetX = 0, offsetY = 0 } = transform;
   return {
     ...detection,
-    x1: clamp((detection.x1 - transform.padX) / transform.scale, transform.sourceWidth),
-    y1: clamp((detection.y1 - transform.padY) / transform.scale, transform.sourceHeight),
-    x2: clamp((detection.x2 - transform.padX) / transform.scale, transform.sourceWidth),
-    y2: clamp((detection.y2 - transform.padY) / transform.scale, transform.sourceHeight),
+    x1: clamp(detection.x1 / transform.scaleX + offsetX, transform.sourceWidth),
+    y1: clamp(detection.y1 / transform.scaleY + offsetY, transform.sourceHeight),
+    x2: clamp(detection.x2 / transform.scaleX + offsetX, transform.sourceWidth),
+    y2: clamp(detection.y2 / transform.scaleY + offsetY, transform.sourceHeight),
   };
 }
 
 export function selectVisibleDetections(detections) {
   const bestCourt = detections
-    .filter((detection) => detection.classId === 3)
+    .filter((detection) => detection.classId === COURT_CLASS_ID)
     .sort((a, b) => b.confidence - a.confidence)[0] ?? null;
   const bestBall = detections
-    .filter((detection) => detection.classId === 1)
+    .filter((detection) => detection.classId === BALL_CLASS_ID)
     .sort((a, b) => b.confidence - a.confidence)[0] ?? null;
   return { bestCourt, bestBall };
 }
