@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0e0c" />
+    <title>CourtSide MVP</title>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">On-device test</p>
+          <h1>CourtSide MVP</h1>
+        </div>
+        <p id="orientation-note" class="orientation-note" hidden>Landscape works best</p>
+      </header>
+
+      <section id="camera-container" class="camera-container" aria-label="Camera and detection overlay">
+        <video id="source-video" playsinline muted></video>
+        <canvas id="overlay-canvas"></canvas>
+        <div id="empty-state" class="empty-state">
+          <p>Start the rear camera or choose a local video.</p>
+        </div>
+      </section>
+
+      <section class="controls" aria-label="Source and inference controls">
+        <div class="source-controls">
+          <button id="camera-button" type="button">Start camera</button>
+          <label class="file-button" for="video-input">Test local video</label>
+          <input id="video-input" type="file" accept="video/*" />
+        </div>
+
+        <div id="error-message" class="error-message" role="alert" hidden></div>
+
+        <dl class="metrics" aria-live="polite">
+          <div><dt>Model</dt><dd id="model-status">Loading...</dd></div>
+          <div><dt>Runtime</dt><dd id="runtime-status">Waiting</dd></div>
+          <div><dt>Inference</dt><dd id="fps-status">0.0 FPS</dd></div>
+          <div><dt>Latency</dt><dd id="latency-status">0 ms</dd></div>
+          <div><dt>Court</dt><dd id="court-status">None</dd></div>
+          <div><dt>Ball</dt><dd id="ball-status">None</dd></div>
+        </dl>
+
+        <div class="debug-controls">
+          <label for="confidence-input">Confidence <output id="confidence-value">0.25</output></label>
+          <input id="confidence-input" type="range" min="0.15" max="0.40" step="0.01" value="0.25" />
+          <label class="check-control" for="show-all-input">
+            <input id="show-all-input" type="checkbox" />
+            Show all detections
+          </label>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

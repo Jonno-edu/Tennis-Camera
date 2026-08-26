@@ -1,0 +1,18 @@
+{
+  "name": "courtside-mobile",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vite build && node --test"
+  },
+  "dependencies": {
+    "onnxruntime-web": "^1.22.0"
+  },
+  "devDependencies": {
+    "vite": "^7.0.0"
+  }
+}
