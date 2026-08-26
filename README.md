@@ -148,22 +148,32 @@ If a box is consistently displaced, stop there. Fix resize reversal or display s
 
 ## Deploy to Cloudflare Pages
 
-Connect this repository to a Cloudflare Pages project with these settings:
+The repository carries its own deployment config, so a Pages project needs no hand-typed build settings:
 
 ```text
-Build command: npm run build
-Output directory: dist
+wrangler.toml   name and pages_build_output_dir = "dist"
+.node-version   22.17.0, the Node line Vite 7 requires
+public/_headers cache rules, copied into dist by the build
 ```
 
-Cloudflare Pages supplies HTTPS. No function, Worker, inference API, or database is required.
+Connect the repository in the Cloudflare dashboard and pick this branch, or deploy from a laptop:
 
-Check the size of both the model and the ONNX Runtime WASM file before deployment:
+```bash
+npm run build
+npx wrangler pages deploy
+```
+
+Cloudflare Pages supplies HTTPS, which is what the rear camera needs. No Function, Worker, inference API, or database is involved.
+
+`public/_headers` caches `/assets/*` for a year because Vite fingerprints those filenames. That matters more here than in most apps: the WebGPU WASM binary is 25 MB, and a phone that re-fetches it every visit spends the first minute of every court session downloading. `courtside.onnx` keeps a stable name, so it gets a day instead.
+
+Cloudflare Pages rejects any single file over 25 MiB. The WebGPU runtime built from the current lockfile is 25,749,873 bytes, about 454 KiB under the limit, so a dependency bump can break the deploy without touching this repository's own code. `npm test` now measures every file in `dist` against that limit and fails before Cloudflare does. To read the sizes yourself:
 
 ```bash
 find dist -type f -exec stat -f '%z %N' {} \;
 ```
 
-Cloudflare Pages limits one static file to 25 MiB. The WebGPU runtime built from the current lockfile is 25,749,873 bytes. That is about 454 KiB below the limit. The separate WASM fallback is 13,961,845 bytes. A dependency update could push the WebGPU file over the limit, so treat the production size check as part of every deployment. The CourtSide FP32 model is 10,611,804 bytes.
+The WASM fallback is 13,961,845 bytes and the CourtSide FP32 model is 10,611,804 bytes.
 
 The app loads the two ONNX Runtime builds separately. WASM-only browsers never initialize the WebGPU build. If WebGPU initialization fails, the fallback starts with a clean WASM runtime instead of retrying a failed runtime singleton.
 

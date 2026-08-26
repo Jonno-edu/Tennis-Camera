@@ -1,0 +1,18 @@
+# Vite fingerprints everything under /assets/, including the two ONNX Runtime
+# WASM binaries. The WebGPU build alone is 25 MB, so a phone that re-downloads
+# it on every visit spends most of a court session waiting.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# courtside.onnx keeps a stable name, so it cannot be cached forever. A day is
+# long enough to survive a session and short enough to pick up a new model.
+/models/*
+  Cache-Control: public, max-age=86400
+
+/index.html
+  Cache-Control: no-cache
+
+# getUserMedia is same-origin only. Stated here so a future embed fails loudly
+# rather than silently losing the camera.
+/*
+  Permissions-Policy: camera=(self), microphone=()
