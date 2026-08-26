@@ -40,6 +40,7 @@ Inference runs entirely in the browser. Camera frames are not sent to the server
 
 - Rear-camera access with no microphone request
 - Local video playback through a browser object URL
+- Still images, analysed once with every ball crop swept in that pass
 - WebGPU first, with an independent WASM fallback
 - YOLO11 raw output decoding for `[1, 14, N]` and `[1, N, 14]`
 - Decoding for a common end-to-end NMS output shaped `[1, N, 6]`
@@ -128,7 +129,9 @@ The relevant model classes are fixed to the model card:
 
 ## Test on a desktop
 
-Start with a recorded tennis clip. Click `Test local video` and choose the file. The browser creates a local object URL. It does not upload the video.
+Start with a recorded tennis clip or a single frame. Click `Test video or image` and choose the file. The browser creates a local object URL. It does not upload anything.
+
+A still is analysed once rather than looped. Nothing moves, so there is no reason to sweep the ball crops one per frame the way the video path does, and all of them run in that single pass. Moving the confidence control re-runs the analysis, since a still has no next frame to pick up the new threshold.
 
 Check these points before using a camera:
 

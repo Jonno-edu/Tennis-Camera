@@ -160,10 +160,11 @@ export function clearOverlay(canvas) {
   prepareCanvas(canvas);
 }
 
+/** `source` carries the pixel size of the frame the detections were read from. */
 export function drawOverlay(canvas, source, view) {
   const { detections, bestCourt, bestBall, mapping, ballPosition, show } = view;
   const context = prepareCanvas(canvas);
-  const rect = contentRect(canvas, source.videoWidth, source.videoHeight);
+  const rect = contentRect(canvas, source.width, source.height);
   const courtParts = selectCourtLineDetections(detections, bestCourt);
 
   if (show.all) {

@@ -18,17 +18,18 @@
 
       <section id="camera-container" class="camera-container" aria-label="Camera and detection overlay">
         <video id="source-video" playsinline muted></video>
+        <img id="source-image" alt="Still frame under analysis" hidden />
         <canvas id="overlay-canvas"></canvas>
         <div id="empty-state" class="empty-state">
-          <p>Start the rear camera or choose a local video.</p>
+          <p>Start the rear camera, or choose a local video or image.</p>
         </div>
       </section>
 
       <section class="controls" aria-label="Source and inference controls">
         <div class="source-controls">
           <button id="camera-button" type="button">Start camera</button>
-          <label class="file-button" for="video-input">Test local video</label>
-          <input id="video-input" type="file" accept="video/*" />
+          <label class="file-button" for="video-input">Test video or image</label>
+          <input id="video-input" type="file" accept="video/*,image/*" />
         </div>
 
         <div id="error-message" class="error-message" role="alert" hidden></div>

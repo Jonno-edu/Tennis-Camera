@@ -94,6 +94,7 @@ h1 {
 }
 
 .camera-container video,
+.camera-container img,
 .camera-container canvas {
   position: absolute;
   inset: 0;
